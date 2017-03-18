@@ -103,7 +103,7 @@ def sort_tracks_by_popularity(hip_hop_tracks):
 
 if __name__ == '__main__':
     # Get file path to the desired storage directory:
-    write_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../Data/Spotify'))
+    write_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../Data/ArtistLookupTables/Spotify'))
     sp = main()
     print("Building Track List...")
     hip_hop_tracks = {}
