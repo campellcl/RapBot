@@ -109,16 +109,33 @@ if __name__ == '__main__':
         os.path.dirname(__file__), '../../../Data/ArtistLookupTables/Spotify'))
     input_file_path = os.path.abspath(os.path.join(
         os.path.dirname(__file__), '../../../Data/ArtistLookupTables/GooglePlay'))
-    hip_hop_tracks = {}
-    # Authenticate using Spotipy
-    sp = main()
-    # Read in every desired artist to have top tracks recorded for:
-    hip_hop_artists = read_artists(input_file_path)
-    # Get artist top-ten tracks
-    hip_hop_tracks = get_artists_top_ten_tracks(hip_hop_artists=hip_hop_artists)
-    # hip_hop_tracks = assign_artist_popularity_score(hip_hop_tracks)
-    sorted_by_pop_tracks = sort_tracks_by_popularity(hip_hop_tracks)
-    # log output in json format:
-    with open(write_path + '/SortedTrackLookupTable.json', 'w') as fp:
-        json.dump(sorted_by_pop_tracks, fp=fp)
-        print("Write successful; data saved.")
+    if not os.path.isfile(write_path + '/SortedTrackLookupTable.json'):
+        hip_hop_tracks = {}
+        print("Authenticating Developer Credentials...")
+        # Authenticate using Spotipy
+        sp = main()
+        print("Done!\nReading saved Hip-Hop artists' and their associated Spotify URI's...")
+        # Read in every desired artist to have top tracks recorded for:
+        hip_hop_artists = read_artists(input_file_path)
+        print("Done!\nRetrieving every artist's top ten tracks via Spotify API. Please be patient...")
+        # Get artist top-ten tracks
+        hip_hop_tracks = get_artists_top_ten_tracks(hip_hop_artists=hip_hop_artists)
+        print("Done!\nSorting track lookup table by popularity in descending order...")
+        # hip_hop_tracks = assign_artist_popularity_score(hip_hop_tracks)
+        sorted_by_pop_tracks = sort_tracks_by_popularity(hip_hop_tracks)
+        print("Done!\nDumping result to json...")
+        # log output in json format:
+        with open(write_path + '/SortedTrackLookupTable.json', 'w') as fp:
+            json.dump(sorted_by_pop_tracks, fp=fp, sort_keys=True)
+            print("Write successful; data saved.")
+        print("Done!\nExiting program...")
+    else:
+        print("Saved file:'SortedTrackLookupTable.json' found; loading data. "
+                "Delete the file to re-initialize any stored data.")
+        with open(write_path + '/SortedTrackLookupTable.json', 'r') as fp:
+            saved_lookup_table = json.load(fp, object_pairs_hook=OrderedDict)
+        if saved_lookup_table:
+            print("Lookup-Table loaded successfully.")
+        else:
+            print("Lookup-Table load failure. Aborting execution.")
+            exit(-1)
