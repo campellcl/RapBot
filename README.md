@@ -11,11 +11,13 @@ Data obtained from:
 ## Data Pre-Processing
 * PlainText Tokenization Process
     * Utilizing [Regular Expressions for Tokenizing Text](http://www.nltk.org/book/ch03.html)
+    * Understanding [Regular Expressions in Python](https://www.tutorialspoint.com/python/python_reg_expressions.htm)
+    * Modifying Regular Expressions to [ignore apostrophes](http://stackoverflow.com/questions/2596893/regex-to-match-words-and-those-with-an-apostrophe)
 * Text Normalization
-    1. Normalize text to lowercase
-    2. Remove affixes
-    3. Stemming
-    4. Lemmatization
+    1. Normalizing text to lowercase
+    2. Removing affixes
+    3. Stemming the text
+    4. Performing Lemmatization
 
 ## Deliberations
 * Choosing a Grapheme to Phoneme Engine:
