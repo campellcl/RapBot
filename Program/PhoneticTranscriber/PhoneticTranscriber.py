@@ -1,6 +1,6 @@
 """
 PhoneticTranscriber.py
-Reads plain text song lyrics and performs phonetic transcriptions utilizing the CMU Corpus (nltk).
+Reads ASCII plain text song lyrics and performs phonetic transcriptions utilizing the CMU Corpus (nltk).
 """
 import sys
 import os.path
@@ -13,7 +13,11 @@ __version__ = "4/21/2017"
 
 def main(download_new_corpus, storage_dir):
     """
-    main -Performs setup operations, reading plaintext files, downloading new corpora, and writing transcriptions.
+    main -Performs Grapheme to Phoneme (G2P) Transcriptions by:
+     1. Reading ASCII plaintext files
+     2. Downloading new corpora for use by NLTK (if neccessary)
+     3. Encoding metadata such as (song name, artist name, album, g2p accuracy, etc...) in JSON form
+     4. Writing G2P transcriptions and metadata to output directory in JSON form
     :param DownloadNewCorpus:
     :return:
     """
@@ -31,6 +35,42 @@ def main(download_new_corpus, storage_dir):
     tokenized_lines = tokenize_lines(plain_text)
     # Tokenize Words:
     tokenized_words = tokenize_words(plain_text)
+    # Normalize tokens:
+    tokenized_words = [word.lower() for word in tokenized_words]
+    # Convert tokenized text to NLTK Text object:
+    # tokenized_words = nltk.Text(tokens=tokenized_words)
+    ''' Perform Grapheme to Phoneme (G2P) transcription '''
+    arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
+    ''' Build G2P Transcription Statistics and Metadata'''
+    g2p_json_encoding = {}
+    # TODO: Obtain song metadata. Obtain g2p transcription statistics.
+    ''' Write G2P transcription to storage directory '''
+    # TODO: Write converted words to storage directory in json format. Attach transcription statistics.
+
+def transcribe_arpabet_via_cmu(tokenized_words):
+    """
+    transcribe_arpabet_via_cmu -Performs a Grapheme to Phoneme (G2P) transcription in
+        ARPABET utilizing the NLTK in conjunction with the Carnegie Mellon Pronunciation Dictionary (cmudict).
+    :param tokenized_words: A list of normalized word-level tokens to be phonetically transcribed.
+    :return arpabet_graphones: The ARPABET G2P phonetic transcriptions found in the cmudict.
+    :return failed_transcriptions: The list of provided tokens that could not be mapped to the cmudict.
+    """
+    arpabet_graphones = []
+    failed_transcriptions = []
+    # Instantiate pronunciation dictionary prior to iteration to avoid re-instantiation.
+    pron_dict = cmudict.dict()
+    for token in tokenized_words:
+        token_in_cmudict = False
+        for word, phonemes in pron_dict.items():
+            # TODO: Fuzzy string comparison?
+            if word == token:
+                arpabet_graphones.append((word, phonemes))
+                # print("Token '%s' found in cmudict." % token)
+                token_in_cmudict = True
+        if not token_in_cmudict:
+            print("Token: '%s' not found in cmudict" % token)
+            failed_transcriptions.append(token)
+    return arpabet_graphones, failed_transcriptions
 
 def tokenize_lines(plain_text):
     """
@@ -51,7 +91,6 @@ def tokenize_words(plain_text):
     # Utilize Regular expression to partition on ' ' and '\n':
     tokenized_words = re.split(' |\n', plain_text)
     return tokenized_words
-
 
 if __name__ == '__main__':
     storage_dir = os.path.abspath(os.path.join(
