@@ -89,7 +89,18 @@ def tokenize_words(plain_text):
     :return tokenized_words: A list of words composed using the provided string.
     """
     # Utilize Regular expression to partition on ' ' and '\n':
-    tokenized_words = re.split(' |\n', plain_text)
+    # tokenized_words = re.split(' |\n', plain_text)
+    '''
+    Regular Expression Reads:
+    deliminate on spaces OR new-line characters and ignore apostrophes
+    For more information: http://stackoverflow.com/questions/2596893/regex-to-match-words-and-those-with-an-apostrophe
+    '''
+    tokenized_words = re.split(pattern=r'\s|\n|(?=.*\w)^(\w|\')+$',string=plain_text)
+    # Remove 'None' tokens:
+    tokenized_words = [token for token in tokenized_words if token is not None]
+    # Remove '' tokens:
+    tokenized_words = [token for token in tokenized_words if token is not '''''']
+    # tokenized_words = [token if token is not None else token for token in tokenized_words]
     return tokenized_words
 
 if __name__ == '__main__':
