@@ -9,7 +9,14 @@ Data obtained from:
 * List of Hip-Hop Artists via the [Spotify REST API](https://developer.spotify.com/web-api/) and [Spotipy](https://spotipy.readthedocs.io/en/latest/#)
 
 ## Data Pre-Processing
-* TODO
+* PlainText Tokenization Process
+    * Utilizing [Regular Expressions for Tokenizing Text](http://www.nltk.org/book/ch03.html)
+* Text Normalization
+    1. Normalize text to lowercase
+    2. Remove affixes
+    3. Stemming
+    4. Lemmatization
+
 ## Deliberations
 * Choosing a Grapheme to Phoneme Engine:
     * NLTK Cmudict Corpus
@@ -24,11 +31,12 @@ Data obtained from:
 * What is a Phoneme?
     * What is a Triphone?
 * What is a Grapheme?
-* What is the technical term for ["Pronunciation Spelling"](https://english.stackexchange.com/questions/160499/what-is-the-name-for-pronunciation-spelling) utilized by dictionaries?
+* What is the technical term for the ["Pronunciation Spellings"](https://english.stackexchange.com/questions/160499/what-is-the-name-for-pronunciation-spelling) utilized by dictionaries?
 
 #### Choosing a Grapheme to Phoneme Transcriber:
 * Stack Overflow Question on [Arpabet Phonetic Transcription in Python](http://stackoverflow.com/questions/11911028/python-arpabet-phonetic-transcription)
-* [Phonetisaurus](https://github.com/AdolfVonKleist/Phonetisaurus)
+* The Grapheme to Phoneme Problem[(The "g2p" Problem)](https://linguistics.stackexchange.com/questions/14784/mapping-graphemes-to-phonemes-in-cmudict)
+    * [Phonetisaurus](https://github.com/AdolfVonKleist/Phonetisaurus)
 
 #### Grapheme To Phoneme Transcription via NLTK and Cmudict:
 * The Natural Language Toolkit Book [(NLTKBOOK)](http://www.nltk.org/book/)
