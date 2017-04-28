@@ -92,10 +92,11 @@ def tokenize_words(plain_text):
     # tokenized_words = re.split(' |\n', plain_text)
     '''
     Regular Expression Reads:
-    deliminate on spaces OR new-line characters and ignore apostrophes
+    partition on spaces OR new-line characters and ignore apostrophes
     For more information: http://stackoverflow.com/questions/2596893/regex-to-match-words-and-those-with-an-apostrophe
     '''
-    tokenized_words = re.split(pattern=r'\s|\n|(?=.*\w)^(\w|\')+$',string=plain_text)
+    #tokenized_words = re.split(pattern=r'\s|\n|,|(?=.*\w)^(\w|\')+$',string=plain_text)
+    tokenized_words = re.split(pattern=r'\s|\n|,',string=plain_text)
     # Remove 'None' tokens:
     tokenized_words = [token for token in tokenized_words if token is not None]
     # Remove '' tokens:
