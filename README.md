@@ -21,12 +21,12 @@ Data obtained from:
 
 ## Deliberations
 * Choosing a Grapheme to Phoneme Engine:
-    * NLTK Cmudict Corpus
+    * The Natural Language Toolkit [(NLTK)](nltk.org) Carnegie Mellon University Pronounciation Dictionary [(cmudict Corpus)](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)
     * eSpeak
     * Phonet
 * Choosing a Language for Grapheme to Phoneme Transcription
-    * ARPABET
-    * IPA
+    * The Advanced Research Projects Agency Alphabet [(ARPABET)](https://en.wikipedia.org/wiki/Arpabet)
+    * The International Phonetic Alphabet [(IPA)](https://en.wikipedia.org/wiki/International_Phonetic_Alphabet)
 
 ## Helpful Resources
 #### Learning Phonology
@@ -43,9 +43,9 @@ Data obtained from:
 #### Grapheme To Phoneme Transcription via NLTK and Cmudict:
 * The Natural Language Toolkit Book [(NLTKBOOK)](http://www.nltk.org/book/)
 * pitt.edu [lab on Natural Language Processing via NLTK](http://www.pitt.edu/~naraehan/ling1330/Lab15.html)
-* [NLTK How-Tos](http://www.nltk.org/howto/)
-* Gist on [Triphone retrieval via cmudict](https://gist.github.com/ConstantineLignos/1219749)
-* Carnegie Mellon University's [Speech Center](http://www.speech.cs.cmu.edu/)
+* The Natural Language Toolkit (NLTK)[How-To's](http://www.nltk.org/howto/)
+* A Gist on [Triphone retrieval via cmudict](https://gist.github.com/ConstantineLignos/1219749)
+* Carnegie Mellon University [Speech Center](http://www.speech.cs.cmu.edu/)
 
 
     
