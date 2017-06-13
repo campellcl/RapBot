@@ -47,6 +47,6 @@ Data obtained from:
 * A Gist on [Triphone retrieval via cmudict](https://gist.github.com/ConstantineLignos/1219749)
 * Carnegie Mellon University [Speech Center](http://www.speech.cs.cmu.edu/)
 
-#### Web Scraping With BeautifulSoup 4:
-* Dataquest's [Guide to Web Scraping](https://www.dataquest.io/blog/web-scraping-tutorial-python/)
-    
+#### Web Scraping In Python:
+* Dataquest's [Guide to Web Scraping With BeautifulSoup](https://www.dataquest.io/blog/web-scraping-tutorial-python/)
+* StackOverflow Post [Using lxml and Xpath](https://stackoverflow.com/questions/11465555/can-we-use-xpath-with-beautifulsoup)
