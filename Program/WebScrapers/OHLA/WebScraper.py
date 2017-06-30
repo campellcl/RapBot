@@ -39,11 +39,95 @@ def web_scrape_artists(target_artist_storage_dir):
     write_target_artists_to_json(target_artists, target_artists_loc)
     return target_artists
 
-def web_scrape_albums(target_artist, resume_index):
-    if resume_index == -1:
-        # TODO: write method body
-    target_url = target_artist['url']
-    target_artist['albums'] = {}
+def update_album_info_on_hdd(artist, albums, storage_dir):
+    """
+    update_album_info_on_hdd -Creates a directory for the artist and album on the hard drive if no such directory
+        already exists.
+    :param artist: A dictionary containing the following artist information:
+        1. AID: A unique identifier for the artist.
+        2. name: The string representation of the artists name.
+        3. url: The url associated with the artist.
+        5. scraped: A boolean flag indicating if all albums and songs have been scraped for this particular artist.
+        6. albums: A dictionary of album metadata.
+    :param albums: A dictionary of album metadata containing the following:
+        1. ALID: A unique (in the context of the specified artist) identifier for the album.
+        2. Name: The string representation of the album's name.
+        3. URL
+    :param storage_dir: A directory (in the form of a string) representing the root of the storage directory on
+        the local machine relative to this file.
+    :return:
+    """
+    artist_storage_dir = storage_dir + "/OHLA/Artists/" + artist['name']
+    # If the artist doesn't already have a directory:
+    try:
+        if not os.path.exists(artist_storage_dir):
+            # Create a directory for the artist:
+            os.makedirs(artist_storage_dir)
+    except OSError:
+        print("Exception: OSError in method 'update_album_info_on_hdd'")
+    # Create a directory for every album if it doesn't exist already:
+    for alid, album_info in albums.items():
+        album_storage_dir = artist_storage_dir + "/" + album_info['name']
+        try:
+            if not os.path.exists(album_storage_dir):
+                os.makedirs(album_storage_dir)
+        except OSError:
+            print("OSError Exception: Issued during creation of album storage dir on hdd.")
+
+
+def web_scrape_albums(target_artist_url, resume_scrape_target):
+    """
+    web_scrape_albums -Records the following information about each album found under the provided target_artist_url:
+        1. ALID: The artist-unique identifier for the album (same ALID's exist across multiple artists).
+        2. name: The name of the album as a string.
+        3. url: The url of the album as a string.
+        4. scraped: A boolean flag indicating if all songs on the album have been scraped already.
+    :param target_artist_url: The url of the web directory containing the list of albums.
+    :param resume_scrape_target: A tuple containing targeting information for resuming an unfinished web scrape:
+        resume_alid: The unique (for this artist) album identifier indicating where scraping should resume from.
+        resume_sid: The unique (for this album) song identifier indicating which track scraping should resume from.
+    :return:
+    """
+    albums = {}
+    if not resume_scrape_target[0]:
+        # ALID not recorded for scrape target, record all album info.
+        # Open url to the target artist's web page with GET request:
+        html_response = urlopen(target_artist_url)
+        # Parse the HTML Response:
+        html_parser = etree.HTMLParser()
+        # Create an lxml tree for xpath extraction:
+        tree = etree.parse(html_response, html_parser)
+        # Point xpath target to the <tr> following the <tr> containing the text 'Parent Directory'
+        # artist_album_list_start_xpath = "//body/table/tr/td/a[text()='Parent Directory']/.."
+        # Record the number of <tr> elements:
+        num_tr = int(tree.xpath("count(//body/table/tr)"))
+        # Subtract the three preceding th elements:
+        num_tr -= 3
+        # Subtract the ending th element:
+        num_tr -= 1
+        # Construct an xpath selector for every td containing an album:
+        tr_index = 4
+        artist_album_list_xpaths = []
+        for i in range(num_tr):
+            containing_table_xpath = "//body/table/tr"
+            album_xpath = containing_table_xpath + '[' + str(tr_index) + ']/td/a'
+            artist_album_list_xpaths.append(tree.xpath(album_xpath)[0])
+            tr_index += 1
+        # Extract information for dictionary construction:
+        for i, xpath_element in enumerate(artist_album_list_xpaths):
+            # Specify a unique album ID for this artist:
+            ALID = i
+            album_name = xpath_element.get('href')[0:-1]
+            album_url = target_artist_url + album_name
+            albums[i] = {
+                'ALID': i, 'name': album_name,
+                'url': album_url, 'scraped': False
+            }
+    else:
+        # ALID recorded for scrape target, resume album scrape at specified url.
+        print("CRITICAL: Resume particular album scrape not yet implemented.")
+        # TODO: Resume web scraping at a particular album.
+    return albums
 
 
 def parse_artist_info(target_artists, artist_list_url):
@@ -118,37 +202,51 @@ if __name__ == '__main__':
     if target_artists_json.is_file():
         # The target_artists.json file exists, load into memory
         print("Init: 'target_artists.json' file found. Loading scraping target URL's into memory...")
-        with open(target_artists_loc, 'r+') as fp:
+        with open(target_artists_loc, 'r') as fp:
             # Load the target_artists.json file as an OrderedDictionary:
             target_artists_string_dict = json.load(fp=fp, object_pairs_hook=OrderedDict)
             print("Init: Success! Target URL's loaded into memory. Converting back to integer representation...")
             target_artists = {int(k): v for k, v in target_artists_string_dict.items()}
-            print("Converted. Determining artist to resume scraping at...")
-            target_artist = None
-            for aid, artist_info in target_artists.items():
-                if artist_info['scraped'] is False:
-                    target_artist = artist_info
+        print("Init: Converted. Determining artist to resume scraping at...")
+        target_artist = None
+        for aid, artist_info in target_artists.items():
+            if artist_info['scraped'] is False:
+                target_artist = artist_info
+                break
+        print("Done. Resuming data retrieval at AID: %d, Name: %s, URL: %s." % (
+            target_artist['AID'], target_artist['name'], target_artist['url']))
+        print("Determining existence of prior album information...")
+        resume_scrape_target = None
+        if 'albums' not in target_artist:
+            print("Done. This artist has no prior scraped-albums, initializing containers and scraping albums...")
+            # target_artists[target_artist['AID']]['albums'] = {}
+            resume_alid = None
+            resume_sid = None
+            resume_scrape_target = (resume_alid, resume_sid)
+            albums = web_scrape_albums(
+                target_artist_url=target_artist['url'], resume_scrape_target=resume_scrape_target)
+            update_album_info_on_hdd(artist=target_artist, albums=albums, storage_dir=storage_dir)
+        else:
+            print("Done. Previously scraped album content detected. Finding resume point...")
+            target_album = None
+            resume_alid = None
+            resume_sid = None
+            for alid, album_info in target_artist['albums'].items():
+                if album_info['scraped'] is False:
+                    target_album = album_info
+                    resume_alid = album_info['ALID']
                     break
-            print("Done. Resuming data retrieval at AID: %d, Name: %s, Location: %s." % (
-                target_artist['AID'], target_artist['name'], target_artist['url']))
-            print("Determining existance of prior album information...")
-            resume_index = None
-            if not target_artist['albums']:
-                print("Done. This artist has no prior scraped-albums, initializing containers and scraping albums...")
-                target_artists[target_artists['AID']]['albums'] = {}
-                resume_index = -1
-                albums = web_scrape_albums(target_artist, resume_index)
-            else:
-                print("Done. Previously scraped album content detected. Finding resume point...")
-                target_album = None
-                for alid, album_info in target_artist['albums'].items():
-                    if album_info['scraped'] is False:
-                        target_album = album_info
-                        break
-                print("Found. Resuming album scrape at ALID: %d (%s), URL: %s"
-                      % (target_album['ALID'], target_album['name'], target_album['url']))
-                # for sid, song_info in target_album['']
-                albums = web_scrape_albums(target_artist, resume_index)
+            print("Found. Resuming album scrape at ALID: %d (%s), URL: %s. Finding resume point for track list..."
+                  % (target_album['ALID'], target_album['name'], target_album['url']))
+            for sid, song_info in target_album.items():
+                if song_info['scraped'] is False:
+                    resume_sid = sid
+                    break
+            print("Found. Resuming track list scrape at SID: %d (%s), URL: %s...")
+            resume_scrape_target = (resume_alid, resume_sid)
+            albums = web_scrape_albums(
+                target_artist_url=target_artist['url'], resume_scrape_target=resume_scrape_target)
+            update_album_info_on_hdd(artist=target_artist, albums=albums, storage_dir=storage_dir)
     else:
         # File does not exist, scrape artists and dump to json.
         print("Init: 'target_artists.json' not found. Re-initializing url targets via new WebScrape...")
