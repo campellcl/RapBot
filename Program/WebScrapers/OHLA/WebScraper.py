@@ -39,6 +39,13 @@ def web_scrape_artists(target_artist_storage_dir):
     write_target_artists_to_json(target_artists, target_artists_loc)
     return target_artists
 
+def web_scrape_albums(target_artist, resume_index):
+    if resume_index == -1:
+        # TODO: write method body
+    target_url = target_artist['url']
+    target_artist['albums'] = {}
+
+
 def parse_artist_info(target_artists, artist_list_url):
     """
     Takes a dictionary that is partially completed or completely blank. Will populate dictionary based on the target
@@ -64,7 +71,7 @@ def parse_artist_info(target_artists, artist_list_url):
         try:
             artist_url = 'http://ohhla.com/' + artist_info.get("href")
             artist_identifier = len(target_artists)
-            print("Recorded AID: %d, Artist: %s" %(artist_identifier, artist_name))
+            print("Recorded AID: %d, Artist: %s" % (artist_identifier, artist_name))
             target_artists[artist_identifier] = {
                 'AID': artist_identifier,
                 'name': artist_info.text,
@@ -75,6 +82,15 @@ def parse_artist_info(target_artists, artist_list_url):
             # The artist either has no associated URL or this is just a placeholder HTML tag.
             pass
     return target_artists
+
+def parse_album_info(target_album):
+    """
+    parse_album_info -Takes a
+    :param target_album:
+    :param write_dir:
+    :return:
+    """
+    pass
 
 def write_target_artists_to_json(target_artists, write_dir):
     """
@@ -107,7 +123,32 @@ if __name__ == '__main__':
             target_artists_string_dict = json.load(fp=fp, object_pairs_hook=OrderedDict)
             print("Init: Success! Target URL's loaded into memory. Converting back to integer representation...")
             target_artists = {int(k): v for k, v in target_artists_string_dict.items()}
-            pass
+            print("Converted. Determining artist to resume scraping at...")
+            target_artist = None
+            for aid, artist_info in target_artists.items():
+                if artist_info['scraped'] is False:
+                    target_artist = artist_info
+                    break
+            print("Done. Resuming data retrieval at AID: %d, Name: %s, Location: %s." % (
+                target_artist['AID'], target_artist['name'], target_artist['url']))
+            print("Determining existance of prior album information...")
+            resume_index = None
+            if not target_artist['albums']:
+                print("Done. This artist has no prior scraped-albums, initializing containers and scraping albums...")
+                target_artists[target_artists['AID']]['albums'] = {}
+                resume_index = -1
+                albums = web_scrape_albums(target_artist, resume_index)
+            else:
+                print("Done. Previously scraped album content detected. Finding resume point...")
+                target_album = None
+                for alid, album_info in target_artist['albums'].items():
+                    if album_info['scraped'] is False:
+                        target_album = album_info
+                        break
+                print("Found. Resuming album scrape at ALID: %d (%s), URL: %s"
+                      % (target_album['ALID'], target_album['name'], target_album['url']))
+                # for sid, song_info in target_album['']
+                albums = web_scrape_albums(target_artist, resume_index)
     else:
         # File does not exist, scrape artists and dump to json.
         print("Init: 'target_artists.json' not found. Re-initializing url targets via new WebScrape...")
