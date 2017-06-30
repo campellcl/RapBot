@@ -50,3 +50,4 @@ Data obtained from:
 #### Web Scraping In Python:
 * Dataquest's [Guide to Web Scraping With BeautifulSoup](https://www.dataquest.io/blog/web-scraping-tutorial-python/)
 * StackOverflow Post [Using lxml and Xpath](https://stackoverflow.com/questions/11465555/can-we-use-xpath-with-beautifulsoup)
+* The W3C Gide to [Using XPath Selectors](https://www.w3schools.com/xml/xpath_syntax.asp)
