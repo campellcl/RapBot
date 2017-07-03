@@ -57,7 +57,7 @@ def update_album_info_on_hdd(artist, albums, storage_dir):
         the local machine relative to this file.
     :return:
     """
-    artist_storage_dir = storage_dir + "/OHLA/Artists/" + artist['name']
+    artist_storage_dir = storage_dir + "\\OHLA\\Artists\\" + artist['name']
     # If the artist doesn't already have a directory:
     try:
         if not os.path.exists(artist_storage_dir):
@@ -67,12 +67,12 @@ def update_album_info_on_hdd(artist, albums, storage_dir):
         print("Exception: OSError in method 'update_album_info_on_hdd'")
     # Create a directory for every album if it doesn't exist already:
     for alid, album_info in albums.items():
-        album_storage_dir = artist_storage_dir + "/" + album_info['name']
+        album_storage_dir = artist_storage_dir + "\\" + album_info['name']
         try:
             if not os.path.exists(album_storage_dir):
                 os.makedirs(album_storage_dir)
         except OSError:
-            print("OSError Exception: Issued during creation of album storage dir on hdd.")
+            print("OSError Exception: Issued during creation of album storage directory on hdd.")
 
 
 def web_scrape_albums(target_artist_url, resume_scrape_target):
@@ -218,7 +218,7 @@ if __name__ == '__main__':
         print("Determining existence of prior album information...")
         resume_scrape_target = None
         if 'albums' not in target_artist:
-            print("Done. This artist has no prior scraped-albums, initializing containers and scraping albums...")
+            print("Done. This artist has no prior scraped-albums, initializing containers and scraping album metadata...")
             # target_artists[target_artist['AID']]['albums'] = {}
             resume_alid = None
             resume_sid = None
@@ -226,6 +226,7 @@ if __name__ == '__main__':
             albums = web_scrape_albums(
                 target_artist_url=target_artist['url'], resume_scrape_target=resume_scrape_target)
             update_album_info_on_hdd(artist=target_artist, albums=albums, storage_dir=storage_dir)
+            # update_artist_meta_info(artist=target_artist, albums=albums, storage_dir=storage_dir)
         else:
             print("Done. Previously scraped album content detected. Finding resume point...")
             target_album = None
