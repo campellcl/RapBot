@@ -9,6 +9,7 @@ import json
 from collections import OrderedDict
 from urllib.request import urlopen
 from lxml import etree
+from enum import Enum
 
 __author__ = "Chris Campell"
 __version__ = "7/3/2017"
@@ -36,7 +37,7 @@ def load_web_scraper_target_urls(target_artists_loc):
     """
     with open(target_artists_loc, 'r') as fp:
         # Load the target_artists.json file as an OrderedDictionary:
-        target_artists_string_dict = json.load(fp=fp, object_pairs_hook=OrderedDict)
+        target_artists_string_dict = json.load(fp=fp, object_hook=enum_decoder)
         # print("Init: Success! Target URL's loaded into memory. Converting back to integer representation.")
         target_artists = {int(k): v for k, v in target_artists_string_dict.items()}
     return target_artists
@@ -54,6 +55,7 @@ def get_target_artist_to_scrape(target_artists):
         # If the tuple contains an album identifier (ALID) to resume scraping at:
         if resume_target[0] is not None:
             return aid
+
 
 def parse_artist_info(target_artists, artist_list_url):
     """
@@ -102,7 +104,8 @@ def parse_artist_info(target_artists, artist_list_url):
                 'url': artist_url,
                 'storage_dir': artist_storage_dir,
                 'albums': None,
-                'resume_target': (0, 0)
+                'resume_target': (0, 0),
+                'scraped': ScraperStatus.stage_zero
             }
         except Exception:
             # The artist either has no associated URL or this is just a placeholder HTML tag.
@@ -143,7 +146,7 @@ def write_target_artists_to_json(target_artists, write_dir):
     :return None: Upon completion the provided target_artists dictionary will be written to the specified write_dir.
     """
     with open(write_dir, 'w') as fp:
-        json.dump(target_artists, fp, indent=4)
+        json.dump(target_artists, fp, indent=4, cls=EnumEncoder)
 
 
 def dir_exists(dir_path):
@@ -153,6 +156,7 @@ def dir_exists(dir_path):
     :return Boolean: True if the directory exists on the local machine, False otherwise.
     """
     return os.path.isdir(dir_path)
+
 
 def initialize_artist_storage_directory(artist_name):
     """
@@ -175,6 +179,7 @@ def initialize_artist_storage_directory(artist_name):
             print("Local storage directory did not exist, instantiated!")
         except OSError:
             print("OSError Exception: Issued during creation of artist storage directory on HDD.")
+
 
 def web_scrape_albums(target_artist):
     """
@@ -232,9 +237,10 @@ def web_scrape_albums(target_artist):
                 'url': album_url,
                 'storage_dir': target_artist['storage_dir'] + "\\" + album_name,
                 'songs': None,
-                'scraped': False
+                'scraped': None
             }
     return albums
+
 
 def initialize_album_storage_directory(album_info):
     """
@@ -254,6 +260,7 @@ def initialize_album_storage_directory(album_info):
         except OSError:
             print("OSError Exception: Issued during creation of artist storage directory on HDD.")
 
+
 def main(target_artists):
     for i in range(len(target_artists)):
         print("Web-Scraper: Determining Artist to Resume Scraping At...")
@@ -263,6 +270,9 @@ def main(target_artists):
                 target_artist['aid'], target_artist['name'], target_artist['url']))
         print("Determining if local storage directory for artist exists already...")
         initialize_artist_storage_directory(artist_name=target_artist['name'])
+        # Update artists status in the IR-Pipeline:
+        target_artist['scraped'] = ScraperStatus.stage_one
+        target_artists[target_artist['aid']] = target_artist
         print("Performing second web scraper pass, retrieving album metadata")
         albums = web_scrape_albums(target_artist=target_artist)
         # Update the container data structure:
@@ -271,10 +281,64 @@ def main(target_artists):
         # Initialize a storage directory for every album the artist has:
         for alid, album_info in albums.items():
             initialize_album_storage_directory(album_info)
-        # Done scraping this artist's album metadata dump recorded information to json:
+        # Update the artist's status in the IR-Pipeline:
+        target_artist['scraped'] = ScraperStatus.stage_two
+        target_artists[target_artist['aid']] = target_artist
+        # Done scraping this artist's album-metadata-dump record information to json:
         write_target = target_artist['storage_dir'] + "\\album_metadata.json"
         with open(write_target, 'w') as fp:
             json.dump(albums, fp=fp, indent=4)
+        print("Artist Album metadata stored and album directories created.")
+        # Update global artist metadata json on local HDD in case of program termination:
+        write_target_artists_to_json(target_artists=target_artists, write_dir=target_artists_loc)
+
+
+class ScraperStatus(Enum):
+    """
+    ScraperStatus: An Enumerated type representing the status of the this artist in the information retrieval pipeline.
+    Status assignments proceed as follows:
+     stage_zero: Artist metadata has been retrieved via target_artists.json or just fetched via web-scraper. A new
+        directory for the artist has not been created yet and the information persists only in memory.
+     stage_one: Artist metadata has been retrieved via target_artists.json. A new directory for information retrieved
+        about the artist has been created under Data\OHLA\Artists.
+     stage_two: Album metadata (excluding songs) has been retrieved via web-scraper. A new directory for information
+        retrieved about the album's songs has been created as Data\OHLA\Artists\<ARTIST_NAME>\<ALBUM_NAME>.
+     stage_three: Song HTML information has been retrieved but not yet parsed. HTML data has been stored at the
+        directory Data\OHLA\Artists\<ARTIST_NAME>\<ALBUM_NAME>\<SONG_NAME>.
+     stage_four: Song lyrics have been parsed into plain-text. Automatically generated transcriptions have not yet
+        been performed.
+    """
+    stage_zero = 0
+    stage_one = 1
+    stage_two = 2
+    stage_three = 3
+    stage_four = 4
+
+
+class EnumEncoder(json.JSONEncoder):
+    """
+    EnumEncoder: This class enables the ScraperStatus Enum to be JSON encodable. This method is only called as a hook
+     via json.dump().
+    :source: https://stackoverflow.com/questions/24481852/serialising-an-enum-member-to-json
+    """
+    def default(self, obj):
+        if type(obj) is ScraperStatus:
+            # str(obj) is of type: 'ScraperStatus.stage_zero'
+           return {"__enum__": str(obj)}
+        return json.JSONEncoder.default(self, obj)
+
+def enum_decoder(dict):
+    """
+    enum_decoder: This method enables the ScraperStatus Enum to be JSON decodable (read with json.load()).
+    :param dict: The dictonary returned by json.load, this method is called only as a hook.
+    :return attribute: The ScraperStatus.member that the provided string actually belongs to.
+    :source: https://stackoverflow.com/questions/24481852/serialising-an-enum-member-to-json
+    """
+    if "__enum__" in dict:
+        name, member = dict["__enum__"].split(".")
+        return getattr(ScraperStatus, member)
+    else:
+        return OrderedDict(dict)
 
 if __name__ == '__main__':
     """
