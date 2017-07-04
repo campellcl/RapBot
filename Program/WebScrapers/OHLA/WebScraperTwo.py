@@ -83,18 +83,25 @@ def parse_artist_info(target_artists, artist_list_url):
     # result = etree.tostring(tree, pretty_print=True, method='html')
     artist_anchor_tags_xpath = "//body//div[@id='leftmain']//pre"
     artist_anchor_tags = tree.xpath(artist_anchor_tags_xpath)[0].getchildren()
+    # Declare the intended storage directory for the artist:
+    storage_dir = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), '../../..', 'Data/'
+    ))
     # Excluding the first element extract the elements containing artist info:
     for aid, artist_info in enumerate(artist_anchor_tags[1:]):
         artist_name = artist_info.text
         # If the artist has no associated URL, then ignore the tag (it most likely is a separator anyway)
         try:
             artist_url = 'http://ohhla.com/' + artist_info.get("href")
+            artist_storage_dir = storage_dir + "\\OHLA\\Artists\\" + artist_name
             artist_identifier = len(target_artists)
             print("Recorded AID: %d, Artist: %s" % (artist_identifier, artist_name))
             target_artists[artist_identifier] = {
-                'AID': artist_identifier,
+                'aid': artist_identifier,
                 'name': artist_info.text,
                 'url': artist_url,
+                'storage_dir': artist_storage_dir,
+                'albums': None,
                 'resume_target': (0, 0)
             }
         except Exception:
@@ -163,9 +170,87 @@ def initialize_artist_storage_directory(artist_name):
     if dir_exists(artist_storage_dir):
         print("Local storage directory already exists, no need to instantiate.")
     else:
-        print("Local storage directory does not exist, instantiating...")
         try:
             os.makedirs(artist_storage_dir)
+            print("Local storage directory did not exist, instantiated!")
+        except OSError:
+            print("OSError Exception: Issued during creation of artist storage directory on HDD.")
+
+def web_scrape_albums(target_artist):
+    """
+    web_scrape_albums -Records the following information about each album found under the provided target_artist_url:
+        1. alid: The artist-unique identifier for the album (same ALID's exist across multiple artists).
+        2. name: The name of the album as a human-readable string.
+        3. url: The url marking the location of the album on the web as obtained by the webscraper.
+        4. storage_dir: The target storage directory for files belonging to this album.
+        5. songs: A list of song objects corresponding to this particular album.
+        6. scraped: A boolean flag indicating whether every song on this album has been scraped. If True, all songs on
+         this album have been recorded. If False, the associated artist contains a resume_target field indicating which
+         songs have yet to be scraped on this album.
+        7. resume_scrape_target: A tuple containing targeting information for resuming an unfinished web scrape:
+         resume_alid: The unique (for this artist) album identifier indicating where scraping should resume from.
+         resume_sid: The unique (for this album) song identifier indicating which track scraping should resume from.
+    :param target_artist: The artist whose albums are to be scraped and returned.
+    :return albums: The album metadata for the supplied target_artist
+    """
+    albums = {}
+    if target_artist['resume_target'] is None:
+        # Specific album targeted for resuming scrape.
+        # TODO: Implement this logic.
+        print("Critical: Functionality for resume web scrape album not built yet.")
+    else:
+        # ALID not recorded for scrape target, record all album info.
+        # Open url to the target artist's web page with GET request:
+        html_response = urlopen(target_artist['url'])
+        # Parse the HTML Response:
+        html_parser = etree.HTMLParser()
+        # Create an lxml tree for xpath extraction:
+        tree = etree.parse(html_response, html_parser)
+        # Point xpath target to the <tr> following the <tr> containing the text 'Parent Directory'
+        # artist_album_list_start_xpath = "//body/table/tr/td/a[text()='Parent Directory']/.."
+        # Record the number of <tr> elements:
+        num_tr = int(tree.xpath("count(//body/table/tr)"))
+        # Subtract the three preceding th elements:
+        num_tr -= 3
+        # Subtract the ending th element:
+        num_tr -= 1
+        # Construct an xpath selector for every td containing an album:
+        tr_index = 4
+        artist_album_list_xpaths = []
+        for i in range(num_tr):
+            containing_table_xpath = "//body/table/tr"
+            album_xpath = containing_table_xpath + '[' + str(tr_index) + ']/td/a'
+            artist_album_list_xpaths.append(tree.xpath(album_xpath)[0])
+            tr_index += 1
+        # Extract information for dictionary construction:
+        for i, xpath_element in enumerate(artist_album_list_xpaths):
+            # Specify a unique album ID for this artist:
+            album_name = xpath_element.get('href')[0:-1]
+            album_url = target_artist['url'] + album_name
+            albums[i] = {
+                'alid': i, 'name': album_name,
+                'url': album_url,
+                'storage_dir': target_artist['storage_dir'] + "\\" + album_name,
+                'songs': None,
+                'scraped': False
+            }
+    return albums
+
+def initialize_album_storage_directory(album_info):
+    """
+    initialize_album_storage_directory: Checks to see if the album already has a directory created on the
+     local machine. If no such directory is found then a directory under the provided name is
+     created upnder Data/OHLA/Artists/<ALBUM_ARTIST>/<ALBUM_NAME>.
+    :param album_info: All scraped information regarding the album.
+    :return None: Upon completion, a new directory is created as Data/OHLA/Artists/<ALBUM_ARTIST>/<ALBUM_NAME>
+     if no such directory had previously existed. If said directory had existed, it is left unmodified.
+    """
+    if dir_exists(album_info['storage_dir']):
+        print("Local storage directory already exists, no need to instantiate.")
+    else:
+        try:
+            os.makedirs(album_info['storage_dir'])
+            print("Local storage directory did not exist, instantiated!")
         except OSError:
             print("OSError Exception: Issued during creation of artist storage directory on HDD.")
 
@@ -175,11 +260,21 @@ def main(target_artists):
         resume_target_aid = get_target_artist_to_scrape(target_artists)
         target_artist = target_artists[resume_target_aid]
         print("Done. Resuming data retrieval at AID: %d, Name: %s, URL: %s." % (
-                target_artist['AID'], target_artist['name'], target_artist['url']))
+                target_artist['aid'], target_artist['name'], target_artist['url']))
         print("Determining if local storage directory for artist exists already...")
         initialize_artist_storage_directory(artist_name=target_artist['name'])
-
-
+        print("Performing second web scraper pass, retrieving album metadata")
+        albums = web_scrape_albums(target_artist=target_artist)
+        # Update the container data structure:
+        target_artist['albums'] = albums
+        target_artist['resume_target'] = (None, None)
+        # Initialize a storage directory for every album the artist has:
+        for alid, album_info in albums.items():
+            initialize_album_storage_directory(album_info)
+        # Done scraping this artist's album metadata dump recorded information to json:
+        write_target = target_artist['storage_dir'] + "\\album_metadata.json"
+        with open(write_target, 'w') as fp:
+            json.dump(albums, fp=fp, indent=4)
 
 if __name__ == '__main__':
     """
@@ -188,7 +283,8 @@ if __name__ == '__main__':
         associated urls.
         * If this file does not exist, it is created.
         * If this file does exist, target information for the web-scraper is loaded into memory and web-scraping is
-            resumed as specified.
+            resumed by original order of retrieval for artists.
+    2.
     """
     # Instantiate the storage directory relative to this file in the project hierarchy:
     storage_dir = os.path.abspath(os.path.join(
@@ -203,7 +299,7 @@ if __name__ == '__main__':
         print("Init: Target URL's loaded into memory. Proceeding to main Web-Scraper loop.")
     else:
         # The file containing target metadata was not found. Initialize web scraper to obtain target information.
-        print("Init: 'target_artists.json' not found. Re-initializing URL targets via Web-Scrape...")
+        print("Init: 'target_artists.json' not found. Initializing URL targets via Web-Scrape...")
         target_artists = web_scrape_artist_meta_data()
         # Write the metadata to the hard-drive for retrieval:
         write_target_artists_to_json(target_artists, target_artists_loc)
