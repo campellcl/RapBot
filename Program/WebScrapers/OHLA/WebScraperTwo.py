@@ -8,6 +8,7 @@ from pathlib import Path
 import json
 from collections import OrderedDict
 from urllib.request import urlopen
+from urllib.error import HTTPError
 from lxml import etree
 from enum import Enum
 
@@ -206,7 +207,12 @@ def web_scrape_albums(target_artist):
     else:
         # ALID not recorded for scrape target, record all album info.
         # Open url to the target artist's web page with GET request:
-        html_response = urlopen(target_artist['url'])
+        try:
+            html_response = urlopen(target_artist['url'])
+        except HTTPError as err:
+            print("HTTPError: Critical error 404, file not found. Reason: %s" % err.reason)
+            print("Blacklisting artist, removing from 'target_artists.json' and proceeding to next artist.")
+            return None
         # Parse the HTML Response:
         html_parser = etree.HTMLParser()
         # Create an lxml tree for xpath extraction:
@@ -275,22 +281,33 @@ def main(target_artists):
         target_artists[target_artist['aid']] = target_artist
         print("Performing second web scraper pass, retrieving album metadata")
         albums = web_scrape_albums(target_artist=target_artist)
-        # Update the container data structure:
-        target_artist['albums'] = albums
-        target_artist['resume_target'] = (None, None)
-        # Initialize a storage directory for every album the artist has:
-        for alid, album_info in albums.items():
-            initialize_album_storage_directory(album_info)
-        # Update the artist's status in the IR-Pipeline:
-        target_artist['scraped'] = ScraperStatus.stage_two
-        target_artists[target_artist['aid']] = target_artist
-        # Done scraping this artist's album-metadata-dump record information to json:
-        write_target = target_artist['storage_dir'] + "\\album_metadata.json"
-        with open(write_target, 'w') as fp:
-            json.dump(albums, fp=fp, indent=4)
-        print("Artist Album metadata stored and album directories created.")
-        # Update global artist metadata json on local HDD in case of program termination:
-        write_target_artists_to_json(target_artists=target_artists, write_dir=target_artists_loc)
+        # if albums is None then artist was blacklisted due to some technical difficulty:
+        if albums is not None:
+            # Update the container data structure:
+            target_artist['albums'] = albums
+            target_artist['resume_target'] = (None, None)
+            # Initialize a storage directory for every album the artist has:
+            for alid, album_info in albums.items():
+                initialize_album_storage_directory(album_info)
+            # Update the artist's status in the IR-Pipeline:
+            target_artist['scraped'] = ScraperStatus.stage_two
+            target_artists[target_artist['aid']] = target_artist
+            # Done scraping this artist's album-metadata-dump record information to json:
+            write_target = target_artist['storage_dir'] + "\\album_metadata.json"
+            try:
+                with open(write_target, 'w') as fp:
+                    json.dump(albums, fp=fp, indent=4)
+            except OSError as err:
+                print("OSError: Artist name is too weird. Blacklisting artist.")
+                del target_artists[target_artist['aid']]
+            print("Artist Album metadata stored and album directories created.")
+            # Update global artist metadata json on local HDD in case of program termination:
+            write_target_artists_to_json(target_artists=target_artists, write_dir=target_artists_loc)
+        else:
+            # Artist was blacklisted, their data couldn't be retrieved.
+            # Scrub the artist from target_artists.json:
+            del target_artists[target_artist['aid']]
+            # TODO: Write more elegant code which retains a list of blacklisted artists for analysis and debugging.
 
 
 class ScraperStatus(Enum):
