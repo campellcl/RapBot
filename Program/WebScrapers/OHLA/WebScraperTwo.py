@@ -344,6 +344,7 @@ class EnumEncoder(json.JSONEncoder):
            return {"__enum__": str(obj)}
         return json.JSONEncoder.default(self, obj)
 
+
 def enum_decoder(dict):
     """
     enum_decoder: This method enables the ScraperStatus Enum to be JSON decodable (read with json.load()).
@@ -372,6 +373,7 @@ if __name__ == '__main__':
         os.path.dirname(__file__), '../../..', 'Data/'
     ))
     # Construct the target directory for the file containing artist metadata:
+    artist_metadata_loc = storage_dir + "\\OHLA\\WebScraper\\MetaData\\"
     target_artists_loc = storage_dir + "\\OHLA\\WebScraper\\MetaData\\target_artists.json"
     if file_exists(fpath=target_artists_loc):
         # The file containing target metadata was found, load into memory:
