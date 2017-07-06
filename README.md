@@ -46,6 +46,8 @@ Data obtained from:
 * The Natural Language Toolkit (NLTK) [How-To's](http://www.nltk.org/howto/)
 * A Gist on [Triphone retrieval via cmudict](https://gist.github.com/ConstantineLignos/1219749)
 * Carnegie Mellon University [Speech Center](http://www.speech.cs.cmu.edu/)
+* CMUDict wrapper: [PronunDict](https://sourceforge.net/projects/pronundict/)
+* A [coding example](https://github.com/mphilli/English_to_IPA) converting CMUDict ARPABET to IPA
 
 #### Web Scraping In Python:
 * Dataquest's [Guide to Web Scraping With BeautifulSoup](https://www.dataquest.io/blog/web-scraping-tutorial-python/)
