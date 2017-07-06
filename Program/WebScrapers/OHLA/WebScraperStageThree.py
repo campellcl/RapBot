@@ -139,6 +139,8 @@ def web_scrape_target_songs(target_album):
         html_response = urlopen(target_album['url'])
     except HTTPError as err:
         print("HTTPError: Critical error 404, file not found. Reason: %s" % err.reason)
+        print("HTTPError: Failure to retrieve target songs for album ALID: %d (%s) at URL: %s"
+              % (target_album['alid'], target_album['name'], target_album['url']))
         # TODO: Log the album that the program failed to retrieve for further analysis.
         return None
     # Parse the HTML Response:
@@ -192,9 +194,21 @@ def web_scrape_song_plaintext(target_song):
     html_parser = etree.HTMLParser()
     # Create an lxml tree for xpath extraction:
     tree = etree.parse(html_response, html_parser)
-    # It is always the third <div> element that contains the lyrics:
+    # It is usually the third <div> element that contains the lyrics:
     target_ascii_xpath = "//body/div[3]/pre"
-    ascii_xpath = tree.xpath(target_ascii_xpath)[0]
+    try:
+        ascii_xpath = tree.xpath(target_ascii_xpath)[0]
+    except Exception as exception:
+        print("Exception (cause: %s) encountered while parsing plaintext lyrics at %s. Trying to "
+              "scrape plaintext from single leading <pre> tag." % (exception.__cause__, target_song['url']))
+        try:
+            target_ascii_xpath = "//body/p"
+            ascii_xpath = tree.xpath(target_ascii_xpath)[0]
+            print("Success, data obtained using fallback xpath. Verify contents of the directory (%s) are correct."
+                  % target_song['storage_dir'])
+        except Exception as exception:
+            print("Exception (cause: %s) still encountered while attempting backup plaintext parse at %s. Programmer "
+                  "intervention required!" %(exception.__cause__, target_song['url']))
     plain_text = ascii_xpath.text
     return plain_text
 
@@ -224,32 +238,51 @@ def init_song_storage_dir(target_song):
 def main(target_artists):
     # Scrape every artist's song data:
     for aid, artist_info in target_artists.items():
+        # If the artist has already reached stage_three in the IR pipeline, then ignore.
         if artist_info['scraped'].value != ScraperStatus.stage_three.value:
             # print("Scraping Artist AID: %d (%s) songs." %())
             for alid, album_info in artist_info['albums'].items():
-                # Parse song meta-information:
-                target_songs = web_scrape_target_songs(target_album=album_info)
-                # Parse song ASCII (plain-text) for every song:
-                for sid, song_info in target_songs.items():
-                    plain_text = web_scrape_song_plaintext(song_info)
+                # If the album has already been scraped entirely than ignore.
+                if not album_info['scraped']:
+                    # Parse song meta-information:
+                    target_songs = web_scrape_target_songs(target_album=album_info)
+                    if target_songs is None:
+                        # Target urls could not be retrieved, skip this album.
+                        break
+                    # Parse song ASCII (plain-text) for every song:
+                    for sid, song_info in target_songs.items():
+                        plain_text = web_scrape_song_plaintext(song_info)
+                        if plain_text is not None:
+                            # Update containing data structure:
+                            target_songs[sid]['ascii'] = plain_text
+                            # target_songs[sid]['ascii'] = plain_text.encode("utf-8")
+                            target_artists[aid]['resume_target'] = (alid, sid)
+                            # Create song storage directory on local HDD:
+                            init_song_storage_dir(target_song=target_songs[sid])
+                            # Write plaintext to storage directory as file:
+                            with open(target_songs[sid]['storage_dir'] + "/ascii.txt", 'w', encoding='utf-8') as fp:
+                                fp.write(plain_text)
+                        else:
+                            # TODO: If both web-scraping attempts fail
+                            print("\t\tWS[StageThree]: Warning, both Web-Scraper attempts failed. Programmer "
+                                  "action required!")
                     # Update containing data structure:
-                    target_songs[sid]['ascii'] = plain_text
-                    # target_songs[sid]['ascii'] = plain_text.encode("utf-8")
-                    target_artists[aid]['resume_target'] = (alid, sid)
-                    # Create song storage directory on local HDD:
-                    init_song_storage_dir(target_song=target_songs[sid])
-                    # Write plaintext to storage directory as file:
-                    with open(target_songs[sid]['storage_dir'] + "/ascii.txt", 'w', encoding='utf-8') as fp:
-                        fp.write(plain_text)
-                # Update containing data structure:
-                target_artists[aid]['albums'][alid]['songs'] = target_songs
-                target_artists[aid]['scraped'] = ScraperStatus.stage_three
-                # Update metadata container on HDD:
-                write_location = artist_metadata_loc + "target_artists_stage_three.json"
-                write_target_artists_to_json(target_artists, write_location)
+                    target_artists[aid]['albums'][alid]['songs'] = target_songs
+                    target_artists[aid]['albums'][alid]['scraped'] = True
+                    # Update metadata container on HDD:
+                    write_location = artist_metadata_loc + "target_artists_stage_three.json"
+                    write_target_artists_to_json(target_artists, write_location)
+                    # Print status update:
+                    print("\tWS[StageThree]: Backed up to hard drive. Finished scraping album ALID: "
+                          "%s (%s) for artist AID: %s (%s)" %(alid, album_info['name'], aid, artist_info['name']))
+                else:
+                    # The album has already been scraped in its entirety:
+                    print("\tWS[StageThree]: The album ALID: %s (%s) for artist AID: %s (%s) has already been scraped "
+                          "and stored. Skipping to next unscraped album." %
+                          (alid, album_info['name'], aid, artist_info['name']))
             # Update metadata information for artist:
             target_artists[aid]['resume_target'] = (None, None)
-            target_artists[aid]['scraped'] = True
+            target_artists[aid]['scraped'] = ScraperStatus.stage_three
             print("WS[StageThree]: Backed up to hard drive. Finished scraping song info for artist AID: %d (%s)"
                   % (aid, artist_info['name']))
         else:
@@ -265,7 +298,7 @@ if __name__ == '__main__':
     ))
     # Construct the target directory for the file containing artist metadata:
     artist_metadata_loc = storage_dir + "\\OHLA\\WebScraper\\MetaData\\"
-    target_artists_loc = storage_dir + "\\OHLA\\WebScraper\\MetaData\\target_artists.json"
+    target_artists_loc = storage_dir + "\\OHLA\\WebScraper\\MetaData\\target_artists_stage_three.json"
     # Ensure target_artists.json exists:
     if not file_exists(fpath=target_artists_loc):
         print("Init: Critical Error! Could not find the specified source file: 'target_artists.json'.")
