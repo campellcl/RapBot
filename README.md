@@ -28,6 +28,10 @@ Data obtained from:
     * The Advanced Research Projects Agency Alphabet [(ARPABET)](https://en.wikipedia.org/wiki/Arpabet)
     * The International Phonetic Alphabet [(IPA)](https://en.wikipedia.org/wiki/International_Phonetic_Alphabet)
 
+## Handling Slang
+* General Idea: Create a dictionary of failed transcriptions sorted by occurrence.
+* Manually create transcription rules for the most common slang terms.
+
 ## Helpful Resources
 #### Learning Phonology
 * What is a Phoneme?
@@ -47,7 +51,13 @@ Data obtained from:
 * A Gist on [Triphone retrieval via cmudict](https://gist.github.com/ConstantineLignos/1219749)
 * Carnegie Mellon University [Speech Center](http://www.speech.cs.cmu.edu/)
 * CMUDict wrapper: [PronunDict](https://sourceforge.net/projects/pronundict/)
-* A [coding example](https://github.com/mphilli/English_to_IPA) converting CMUDict ARPABET to IPA
+
+#### Converting ARPABET to IPA Transcriptions
+* StackOverflow on [ARPABET to IPA Translation](https://stackoverflow.com/questions/33111685/convert-arpabet-to-ipa-with-stress) via:
+    * [Automatic Syllable Detection](https://stackoverflow.com/questions/405161/detecting-syllables-in-a-word)
+* One StackOverflow user's implementation of a [transcription converter](https://github.com/mphilli/English_to_IPA)
+* Stanford University resource: [conversion chart between ARPABET and IPA](http://web.stanford.edu/class/linguist238/fig04.01.pdf)
+* Wikipedia [ARPABET article with conversion charts](https://en.wikipedia.org/wiki/Arpabet)
 
 #### Web Scraping In Python:
 * Dataquest's [Guide to Web Scraping With BeautifulSoup](https://www.dataquest.io/blog/web-scraping-tutorial-python/)
