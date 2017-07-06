@@ -22,7 +22,7 @@ Data obtained from:
 ## Deliberations
 * Choosing a Grapheme to Phoneme Engine:
     * The Natural Language Toolkit [(NLTK)](nltk.org) Carnegie Mellon University Pronounciation Dictionary [(cmudict Corpus)](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)
-    * eSpeak
+    * Automatically Generated IPA Transcription via [eSpeak](https://github.com/rhdunn/espeak)
     * Phonet
 * Choosing a Language for Grapheme to Phoneme Transcription
     * The Advanced Research Projects Agency Alphabet [(ARPABET)](https://en.wikipedia.org/wiki/Arpabet)
@@ -43,7 +43,7 @@ Data obtained from:
 #### Grapheme To Phoneme Transcription via NLTK and Cmudict:
 * The Natural Language Toolkit Book [(NLTKBOOK)](http://www.nltk.org/book/)
 * pitt.edu [lab on Natural Language Processing via NLTK](http://www.pitt.edu/~naraehan/ling1330/Lab15.html)
-* The Natural Language Toolkit (NLTK)[How-To's](http://www.nltk.org/howto/)
+* The Natural Language Toolkit (NLTK) [How-To's](http://www.nltk.org/howto/)
 * A Gist on [Triphone retrieval via cmudict](https://gist.github.com/ConstantineLignos/1219749)
 * Carnegie Mellon University [Speech Center](http://www.speech.cs.cmu.edu/)
 
