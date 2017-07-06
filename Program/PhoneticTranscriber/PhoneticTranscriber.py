@@ -39,7 +39,7 @@ def main(download_new_corpus, storage_dir):
     tokenized_words = [word.lower() for word in tokenized_words]
     # Convert tokenized text to NLTK Text object:
     # tokenized_words = nltk.Text(tokens=tokenized_words)
-    ''' Perform Grapheme to Phoneme (G2P) transcription '''
+    ''' Perform Grapheme to Phoneme (G2P) transcription in ARPABET'''
     arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
     ''' Build G2P Transcription Statistics and Metadata'''
     g2p_json_encoding = {}
@@ -67,6 +67,7 @@ def transcribe_arpabet_via_cmu(tokenized_words):
                 arpabet_graphones.append((word, phonemes))
                 # print("Token '%s' found in cmudict." % token)
                 token_in_cmudict = True
+                break
         if not token_in_cmudict:
             print("Token: '%s' not found in cmudict" % token)
             failed_transcriptions.append(token)
