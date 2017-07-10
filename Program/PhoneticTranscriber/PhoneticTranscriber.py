@@ -230,6 +230,7 @@ def remove_dj_tag(tokenized_lines):
             dj_cleaned_text.append(line)
     return dj_cleaned_text
 
+
 def clean_tokenized_lines(tokenized_lines):
     """
     clean_tokenized_lines: Cleans the provided tokenized lines by removing the following tags:
@@ -244,10 +245,40 @@ def clean_tokenized_lines(tokenized_lines):
     tokenized_lines = remove_dj_tag(tokenized_lines)
     cleaned_tokenized_lines = []
     for line_num, line in enumerate(tokenized_lines):
-        # Remove [*ACTION*] tags:
-        if "[*" not in line:
+        normalized_line = str.lower(line)
+        # Specify regex to remove all lines containing '[', any number of characters, then ']':
+        regex = re.compile(r'\[(.*)\]')
+        # Only add lines that contain no text wrapped in square brackets:
+        if not regex.search(normalized_line):
             cleaned_tokenized_lines.append(line)
-        # Remove [
+    return cleaned_tokenized_lines
+
+
+def repeat_specified_lines(tokenized_lines):
+    """
+    repeat_specified_lines: Identifies lines in the song lyrics that contain a ascii instruction to duplicate the line.
+    Lines that contain such commands (often expressed as xN to indicate the preceding line should be repeated N times),
+    should be duplicated N times so that the symbol matching algorithm can identify same-rhymes.
+    :param tokenized_lines: The list of song lyrics delimited by a '\n' character.
+    :return tokenized_lines_with_repeat: The provided song lyrics with lines marked with xN repeated N times.
+    """
+    tokenized_lines_with_repeat = []
+    # Define the regex expression to identify xN:
+    regex = re.compile(r'x\d')
+    for line_num, line in enumerate(tokenized_lines):
+        normalized_line = str.lower(line)
+        if not regex.search(normalized_line):
+            tokenized_lines_with_repeat.append(line)
+        else:
+            # The line in question contains instructions to repeat the line 'N' times.
+            matched_text = regex.search(normalized_line).group(0)
+            num_rep = int(matched_text[len(matched_text) - 1])
+            # Remove the repeat instruction from the lyric line:
+            line_to_repeat = line.replace(matched_text, '')
+            # Repeat the line 'N' times (without repeating the repeat instruction):
+            for i in range(num_rep):
+                tokenized_lines_with_repeat.append(line_to_repeat)
+    return tokenized_lines_with_repeat
 
 
 def tokenize_lines(plain_text):
@@ -262,7 +293,9 @@ def tokenize_lines(plain_text):
     chorus = identify_chorus_lines(tokenized_lines_with_spaces=tokenized_lines)
     ''' Remove empty lines in the song that served previously as Chorus delimiters '''
     tokenized_lines = [line for line in tokenized_lines[5:] if line is not ""]
-    ''' Clean the text by removing tags such as: '[Applause]', '[Chorus]', and '[Verse x]'. '''
+    ''' Expand lines in the song that contain a specified number of repetitions (for same rhyme identification)'''
+    tokenized_lines = repeat_specified_lines(tokenized_lines)
+    ''' Clean the lyrics by removing tags ([text]) such as: '[Applause]', '[Chorus]', and '[Verse x]'. '''
     tokenized_lines = clean_tokenized_lines(tokenized_lines)
     # TODO: The line numbers recorded in chorus are from the tokenized lines with spaces. The numbers will all shift
     # once the spaces are removed. How can I efficently update the line indices?
