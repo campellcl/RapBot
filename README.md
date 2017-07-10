@@ -7,6 +7,8 @@ Data obtained from:
 * [Online Hip-Hop Lyrics Archive](http://ohhla.com/all.html)
 * [Rap Genius](https://rap.genius.com/)
 * List of Hip-Hop Artists via the [Spotify REST API](https://developer.spotify.com/web-api/) and [Spotipy](https://spotipy.readthedocs.io/en/latest/#)
+* Discography Wiki Based Website [Discogs](https://www.discogs.com/search/) with developer support via [Discog API](https://www.discogs.com/developers/)
+* Another possiblity (unresearched as of yet) [allmusic](http://www.allmusic.com/)
 
 ## Data Pre-Processing
 * PlainText Tokenization Process
