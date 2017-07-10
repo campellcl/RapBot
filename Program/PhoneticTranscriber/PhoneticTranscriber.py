@@ -92,46 +92,6 @@ def load_web_scraper_target_urls(target_artists_loc):
     return target_artists
 
 
-def main(download_new_corpus, storage_dir):
-    """
-    main -Performs Grapheme to Phoneme (G2P) Transcriptions by:
-     1. Reading ASCII plaintext files
-     2. Downloading new corpora for use by NLTK (if neccessary)
-     3. Encoding metadata such as (song name, artist name, album, g2p accuracy, etc...) in JSON form
-     4. Writing G2P transcriptions and metadata to output directory in JSON form
-    :param download_new_corpus: A boolean flag indicating if a new CMUDict corpus should be fetched from the external
-        server.
-    :return None: Upon completion, TODO: method header.
-    """
-    if download_new_corpus:
-        nltk.download_gui()
-        # Print the paths that NLTK uses for Corpora: print(nltk.data.path)
-        sys.exit(0)
-    ''' Read Plaintext from Files '''
-    for aid, artist_info in target_artists.items():
-        for alid, album_info in artist_info['albums'].items():
-            for sid, song_info in album_info['songs'].items():
-                song_ascii = song_info['ascii']
-                ''' Tokenize Plaintext '''
-                # Tokenize Lines:
-                tokenized_lines = tokenize_lines(song_ascii)
-                # The first four lines of the song are always the header, so exclude the meta-information:
-                tokenized_lines = tokenized_lines[4:]
-                # Tokenize Words:
-                tokenized_words = tokenize_words(tokenized_lines)
-                # Normalize tokens:
-                tokenized_words = [word.lower() for word in tokenized_words]
-                # Convert tokenized text to NLTK Text object:
-                # tokenized_words = nltk.Text(tokens=tokenized_words)
-                ''' Perform Grapheme to Phoneme (G2P) transcription in ARPABET'''
-                arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
-                ''' Build G2P Transcription Statistics and Metadata'''
-                g2p_json_encoding = {}
-                # TODO: Obtain song metadata. Obtain g2p transcription statistics.
-                ''' Write G2P transcription to storage directory '''
-                # TODO: Write converted words to storage directory in json format. Attach transcription statistics.
-
-
 def transcribe_arpabet_via_cmu(tokenized_words):
     """
     transcribe_arpabet_via_cmu -Performs a Grapheme to Phoneme (G2P) transcription in
@@ -196,24 +156,6 @@ def identify_chorus_lines(tokenized_lines_with_spaces):
     return chorus
 
 
-def tokenize_lines(plain_text):
-    """
-    tokenize_lines -Accepts the lyrics of a song as a string and partitions the string into a list of lines.
-    :param plain_text: The string containing song lyrics read from plaintext or HTML.
-    :return tokenized_lines: A list of lines composed of the provided string deliminated on '\n'
-    """
-    # Utilize str.split() to partition on '\n' character:
-    tokenized_lines = str.split(plain_text, sep='\n')
-    ''' Identify the lines in the song that constitute the Chorus '''
-    chorus = identify_chorus_lines(tokenized_lines_with_spaces=tokenized_lines)
-    # TODO: The line numbers recorded in chorus are from the tokenized lines with spaces. The numbers will all shift
-    # once the spaces are removed. How can I efficently update the line indices?
-    tokenized_lines = [line for line in tokenized_lines if line is not ""]
-    # TODO: How to handle noise like [Applause] and 'lyrics 4x'
-    # Mark the line number associated with a [Chorus] tag and then
-    return tokenized_lines
-
-
 def tokenize_words(line_deliminated_lyrics):
     """
     tokenize_words -Accepts the lyrics of a song as a list of lines and seperates them into a list of words.
@@ -238,6 +180,136 @@ def tokenize_words(line_deliminated_lyrics):
         # tokenized_words = [token if token is not None else token for token in tokenized_words]
         tokenized_lyrics[line_num] = tokenized_words
     return tokenized_lyrics
+
+
+def substitute_chorus(tokenized_lines_with_spaces, chorus):
+    """
+    substitute_chorus: Accepts the lyrics of a song delimited with newlines (containing empty lines), and the
+    pre-extracted chorus. Replaces all '[chorus]' tags in the song with the actual chorus lyrics.
+    :param tokenized_lines_with_spaces: A list of plaintext lyrics deliminated by \n character with "" still present as
+        sometimes the only way to identify the end of the chorus is via blank spaces "".
+    :param chorus: The chorus identified via 'identify_chorus_lines'.
+    :return tokenized_lines_with_chorus: The provided tokenized lines with the chorus lyrics now substituted in place
+        of the '[chorus]' tag.
+    """
+    # TODO: Write method body.
+    pass
+
+
+def remove_dj_tag(tokenized_lines):
+    """
+    remove_dj_tag: Removes the lines in the song following a [DJ] tag (as DJ commentary has no lyrical value).
+    :param tokenized_lines: The list of song lyrics delimited by a '\n' character.
+    :return dj_cleaned_text: The provided list of song lyrics with the lyrics spoken by the DJ removed.
+    """
+    dj_start_line_index = None
+    dj_end_line_index = None
+    # Identify the line number that indicates the start of the [DJ] tag:
+    for line_num, line in enumerate(tokenized_lines):
+        normalized_line = str.lower(line)
+        # Identify the line number that indicates the start of the chorus:
+        if '[dj]' in normalized_line:
+            dj_start_line_index = line_num
+            break
+    # Identify the line number that indicates the end of the [DJ] tag:
+    if dj_start_line_index is not None:
+        for line_num, line in enumerate(tokenized_lines[dj_start_line_index+1:]):
+            normalized_line = str.lower(line)
+            # Define regex expression to identify a '[' with any number of characters followed by another ']':
+            regex = re.compile(r'\[(.*)\]')
+            # A line containing the above regex expression is the termination point for the DJ's commentary:
+            if regex.search(normalized_line):
+                dj_end_line_index = line_num + dj_start_line_index + 1
+                break
+    # Return the text with the specified line range omitted:
+    dj_cleaned_text = []
+    for line_num, line in enumerate(tokenized_lines):
+        if line_num < dj_start_line_index:
+            dj_cleaned_text.append(line)
+        elif line_num > dj_end_line_index:
+            dj_cleaned_text.append(line)
+    return dj_cleaned_text
+
+def clean_tokenized_lines(tokenized_lines):
+    """
+    clean_tokenized_lines: Cleans the provided tokenized lines by removing the following tags:
+        * [DJ]: Removes any following lines after a [DJ] tag as this content is not reflective of the actual song
+            lyrics.
+        * [* ACTION *]: Removes any tags containing an action such as 'Applause' which is not reflective of the actual
+            lyrical content.
+        * [Verse X]: Removes any tags containing verse information so as not to be mistaken as a feature.
+    :param tokenized_lines: The list of ascii lyrics broken into lines.
+    :return cleaned_tokenized_lines: The provided tokenized_lines now cleaned by removing the tags specified above.
+    """
+    tokenized_lines = remove_dj_tag(tokenized_lines)
+    cleaned_tokenized_lines = []
+    for line_num, line in enumerate(tokenized_lines):
+        # Remove [*ACTION*] tags:
+        if "[*" not in line:
+            cleaned_tokenized_lines.append(line)
+        # Remove [
+
+
+def tokenize_lines(plain_text):
+    """
+    tokenize_lines -Accepts the lyrics of a song as a string and partitions the string into a list of lines.
+    :param plain_text: The string containing song lyrics read from plaintext or HTML.
+    :return tokenized_lines: A list of lines composed of the provided string deliminated on '\n'
+    """
+    # Utilize str.split() to partition on '\n' character:
+    tokenized_lines = str.split(plain_text, sep='\n')
+    ''' Identify the lines in the song that constitute the Chorus '''
+    chorus = identify_chorus_lines(tokenized_lines_with_spaces=tokenized_lines)
+    ''' Remove empty lines in the song that served previously as Chorus delimiters '''
+    tokenized_lines = [line for line in tokenized_lines[5:] if line is not ""]
+    ''' Clean the text by removing tags such as: '[Applause]', '[Chorus]', and '[Verse x]'. '''
+    tokenized_lines = clean_tokenized_lines(tokenized_lines)
+    # TODO: The line numbers recorded in chorus are from the tokenized lines with spaces. The numbers will all shift
+    # once the spaces are removed. How can I efficently update the line indices?
+    # tokenized_lines = substitute_chorus(tokenized_lines, chorus)
+    # TODO: How to handle noise like [Applause] and 'lyrics 4x'
+    # Mark the line number associated with a [Chorus] tag and then
+    return tokenized_lines
+
+
+def main(download_new_corpus, storage_dir):
+    """
+    main -Performs Grapheme to Phoneme (G2P) Transcriptions by:
+     1. Reading ASCII plaintext files
+     2. Downloading new corpora for use by NLTK (if neccessary)
+     3. Encoding metadata such as (song name, artist name, album, g2p accuracy, etc...) in JSON form
+     4. Writing G2P transcriptions and metadata to output directory in JSON form
+    :param download_new_corpus: A boolean flag indicating if a new CMUDict corpus should be fetched from the external
+        server.
+    :return None: Upon completion, TODO: method header.
+    """
+    if download_new_corpus:
+        nltk.download_gui()
+        # Print the paths that NLTK uses for Corpora: print(nltk.data.path)
+        sys.exit(0)
+    ''' Read Plaintext from Files '''
+    for aid, artist_info in target_artists.items():
+        for alid, album_info in artist_info['albums'].items():
+            for sid, song_info in album_info['songs'].items():
+                song_ascii = song_info['ascii']
+                ''' Tokenize Plaintext '''
+                # Tokenize Lines:
+                tokenized_lines = tokenize_lines(song_ascii)
+                # The first four lines of the song are always the header, so exclude the meta-information:
+                tokenized_lines = tokenized_lines[4:]
+                # Tokenize Words:
+                tokenized_words = tokenize_words(tokenized_lines)
+                # Normalize tokens:
+                tokenized_words = [word.lower() for word in tokenized_words]
+                # Convert tokenized text to NLTK Text object:
+                # tokenized_words = nltk.Text(tokens=tokenized_words)
+                ''' Perform Grapheme to Phoneme (G2P) transcription in ARPABET'''
+                arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
+                ''' Build G2P Transcription Statistics and Metadata'''
+                g2p_json_encoding = {}
+                # TODO: Obtain song metadata. Obtain g2p transcription statistics.
+                ''' Write G2P transcription to storage directory '''
+                # TODO: Write converted words to storage directory in json format. Attach transcription statistics.
 
 
 if __name__ == '__main__':
