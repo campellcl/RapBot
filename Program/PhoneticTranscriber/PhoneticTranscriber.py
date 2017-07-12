@@ -101,21 +101,25 @@ def transcribe_arpabet_via_cmu(tokenized_words):
     :return failed_transcriptions: The list of provided tokens that could not be mapped to the cmudict.
     """
     arpabet_graphones = []
-    failed_transcriptions = []
+    failed_transcriptions = {}
     # Instantiate pronunciation dictionary prior to iteration to avoid re-instantiation.
     pron_dict = cmudict.dict()
-    for token in tokenized_words:
-        token_in_cmudict = False
-        for word, phonemes in pron_dict.items():
-            # TODO: Fuzzy string comparison?
-            if word == token:
-                arpabet_graphones.append((word, phonemes))
-                # print("Token '%s' found in cmudict." % token)
-                token_in_cmudict = True
-                break
-        if not token_in_cmudict:
-            print("Token: '%s' not found in cmudict" % token)
-            failed_transcriptions.append(token)
+    for line in tokenized_words:
+        for token in line:
+            token_in_cmudict = False
+            for word, phonemes in pron_dict.items():
+                if word == token:
+                    arpabet_graphones.append((word, phonemes))
+                    # print("Token '%s' found in cmudict." % token)
+                    token_in_cmudict = True
+                    break
+            if not token_in_cmudict:
+                # print("Token: '%s' not found in cmudict" % token)
+                # Check to see if the token already exists as a failed transcription:
+                if token in failed_transcriptions:
+                    failed_transcriptions[token] += 1
+                else:
+                    failed_transcriptions[token] = 1
     return arpabet_graphones, failed_transcriptions
 
 
@@ -144,10 +148,14 @@ def identify_chorus_lines(tokenized_lines_with_spaces):
     if chorus_start_line_index is not None:
         for line_num, line in enumerate(tokenized_lines_with_spaces[chorus_start_line_index:]):
             normalized_line = str.lower(line)
-            # The next '' or [Verse #] following the chorus marks the end of the chorus:
-            if '[verse' in normalized_line or normalized_line == '':
+            # The next '' or [] following the chorus marks the end of the chorus:
+            regex = re.compile(r'\[(.*)\]')
+            if regex.search(normalized_line) or normalized_line == '':
                 chorus_end_line_index = line_num + chorus_start_line_index
                 break
+    else:
+        # There is no chorus in the song, just return.
+        return tokenized_lines_with_spaces
     # Capture the text that constitutes the chorus:
     line_num = chorus_start_line_index
     for chorus_line in tokenized_lines_with_spaces[chorus_start_line_index:chorus_end_line_index]:
@@ -162,7 +170,7 @@ def tokenize_words(line_deliminated_lyrics):
     :param tokenized_lyrics: The list of song lyrics read from plaintext.
     :return tokenized_words: A list of words composed using the provided list of lyrics.
     """
-    tokenized_lyrics = OrderedDict()
+    tokenized_lyrics = []
     # Utilize Regular expression to partition on ' ' and '\n':
     # tokenized_words = re.split(' |\n', plain_text)
     '''
@@ -171,14 +179,18 @@ def tokenize_words(line_deliminated_lyrics):
     For more information: http://stackoverflow.com/questions/2596893/regex-to-match-words-and-those-with-an-apostrophe
     '''
     for line_num, line in enumerate(line_deliminated_lyrics):
+        # Remove punctuation like: ! and @:
+        alphanumeric_line = re.sub('[!@#$]', '', line)
+        # Normalize line:
+        alphanumeric_line = str.lower(alphanumeric_line)
         #tokenized_words = re.split(pattern=r'\s|\n|,|(?=.*\w)^(\w|\')+$',string=plain_text)
-        tokenized_words = re.split(pattern=r'\s|\n|,', string=line)
+        tokenized_words = re.split(pattern=r'\s|\n|,', string=alphanumeric_line)
         # Remove 'None' tokens:
         tokenized_words = [token for token in tokenized_words if token is not None]
         # Remove '' tokens:
         tokenized_words = [token for token in tokenized_words if token is not '''''']
         # tokenized_words = [token if token is not None else token for token in tokenized_words]
-        tokenized_lyrics[line_num] = tokenized_words
+        tokenized_lyrics.append(tokenized_words)
     return tokenized_lyrics
 
 
@@ -221,6 +233,9 @@ def remove_dj_tag(tokenized_lines):
             if regex.search(normalized_line):
                 dj_end_line_index = line_num + dj_start_line_index + 1
                 break
+    else:
+        # There is no DJ tag just return the provided text:
+        return tokenized_lines
     # Return the text with the specified line range omitted:
     dj_cleaned_text = []
     for line_num, line in enumerate(tokenized_lines):
@@ -239,6 +254,7 @@ def clean_tokenized_lines(tokenized_lines):
         * [* ACTION *]: Removes any tags containing an action such as 'Applause' which is not reflective of the actual
             lyrical content.
         * [Verse X]: Removes any tags containing verse information so as not to be mistaken as a feature.
+    Additionally, this method removes any background commentary denoted in the lyrics by (text text text).
     :param tokenized_lines: The list of ascii lyrics broken into lines.
     :return cleaned_tokenized_lines: The provided tokenized_lines now cleaned by removing the tags specified above.
     """
@@ -246,11 +262,13 @@ def clean_tokenized_lines(tokenized_lines):
     cleaned_tokenized_lines = []
     for line_num, line in enumerate(tokenized_lines):
         normalized_line = str.lower(line)
+        # Remove any parentheses indicating commentary:
+        normalized_line = re.sub(r'\(.*\)', '', normalized_line)
         # Specify regex to remove all lines containing '[', any number of characters, then ']':
         regex = re.compile(r'\[(.*)\]')
         # Only add lines that contain no text wrapped in square brackets:
         if not regex.search(normalized_line):
-            cleaned_tokenized_lines.append(line)
+            cleaned_tokenized_lines.append(normalized_line)
     return cleaned_tokenized_lines
 
 
@@ -297,11 +315,6 @@ def tokenize_lines(plain_text):
     tokenized_lines = repeat_specified_lines(tokenized_lines)
     ''' Clean the lyrics by removing tags ([text]) such as: '[Applause]', '[Chorus]', and '[Verse x]'. '''
     tokenized_lines = clean_tokenized_lines(tokenized_lines)
-    # TODO: The line numbers recorded in chorus are from the tokenized lines with spaces. The numbers will all shift
-    # once the spaces are removed. How can I efficently update the line indices?
-    # tokenized_lines = substitute_chorus(tokenized_lines, chorus)
-    # TODO: How to handle noise like [Applause] and 'lyrics 4x'
-    # Mark the line number associated with a [Chorus] tag and then
     return tokenized_lines
 
 
@@ -322,27 +335,28 @@ def main(download_new_corpus, storage_dir):
         sys.exit(0)
     ''' Read Plaintext from Files '''
     for aid, artist_info in target_artists.items():
+        print("PT[main]: Parsing PlainText for Artist AID: %d (%s)" % (aid, artist_info['name']))
         for alid, album_info in artist_info['albums'].items():
+            print("\tPT[main]: Parsing plaintext for Album ALID: %s (%s)" % (alid, album_info['name']))
             for sid, song_info in album_info['songs'].items():
+                print("\t\tPT[main]: Parsing PlainText for SID: %s (%s)" % (sid, song_info['name']))
                 song_ascii = song_info['ascii']
                 ''' Tokenize Plaintext '''
                 # Tokenize Lines:
                 tokenized_lines = tokenize_lines(song_ascii)
-                # The first four lines of the song are always the header, so exclude the meta-information:
-                tokenized_lines = tokenized_lines[4:]
-                # Tokenize Words:
+                # Tokenize Words and Normalize Tokens (convert to lower case):
                 tokenized_words = tokenize_words(tokenized_lines)
-                # Normalize tokens:
-                tokenized_words = [word.lower() for word in tokenized_words]
                 # Convert tokenized text to NLTK Text object:
                 # tokenized_words = nltk.Text(tokens=tokenized_words)
                 ''' Perform Grapheme to Phoneme (G2P) transcription in ARPABET'''
+                print("\t\tPT[main]: PlainText tokenized. Performing ARPABET transcription via CMUDict...")
                 arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
-                ''' Build G2P Transcription Statistics and Metadata'''
-                g2p_json_encoding = {}
-                # TODO: Obtain song metadata. Obtain g2p transcription statistics.
-                ''' Write G2P transcription to storage directory '''
-                # TODO: Write converted words to storage directory in json format. Attach transcription statistics.
+                ''' Write G2P Transcription Statistics and Metadata'''
+                # Update json encoding of g2p statistics:
+                write_dir = album_info['storage_dir'] + "\\transcript_stats.json"
+                with open(write_dir, 'w') as fp:
+                    json.dump(fp=fp,obj=failed_transcriptions)
+                print("\t\tPT[main]: Success. Transcription G2P Statistics Written to HDD under album storage dir.")
 
 
 if __name__ == '__main__':
