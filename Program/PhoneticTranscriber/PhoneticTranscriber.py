@@ -353,7 +353,7 @@ def main(download_new_corpus, storage_dir):
                 arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
                 ''' Write G2P Transcription Statistics and Metadata'''
                 # Update json encoding of g2p statistics:
-                write_dir = album_info['storage_dir'] + "\\transcript_stats.json"
+                write_dir = sid['storage_dir'] + "\\transcript_stats.json"
                 with open(write_dir, 'w') as fp:
                     json.dump(fp=fp,obj=failed_transcriptions)
                 print("\t\tPT[main]: Success. Transcription G2P Statistics Written to HDD under album storage dir.")
