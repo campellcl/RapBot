@@ -54,6 +54,9 @@ Data obtained from:
 * Carnegie Mellon University [Speech Center](http://www.speech.cs.cmu.edu/)
 * CMUDict wrapper: [PronunDict](https://sourceforge.net/projects/pronundict/)
 
+#### Grapheme to Phoneme Transcription via eSpeak:
+* Utilizing [eSpeak via command line](https://sourceforge.net/p/espeak/mailman/message/27487520/)
+
 #### Converting ARPABET to IPA Transcriptions
 * StackOverflow on [ARPABET to IPA Translation](https://stackoverflow.com/questions/33111685/convert-arpabet-to-ipa-with-stress) via:
     * [Automatic Syllable Detection](https://stackoverflow.com/questions/405161/detecting-syllables-in-a-word)
