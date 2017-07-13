@@ -353,10 +353,10 @@ def main(download_new_corpus, storage_dir):
                 arpabet_cmu_graphones, failed_transcriptions = transcribe_arpabet_via_cmu(tokenized_words)
                 ''' Write G2P Transcription Statistics and Metadata'''
                 # Update json encoding of g2p statistics:
-                write_dir = sid['storage_dir'] + "\\transcript_stats.json"
+                write_dir = song_info['storage_dir'] + "\\transcript_stats.json"
                 with open(write_dir, 'w') as fp:
                     json.dump(fp=fp,obj=failed_transcriptions)
-                print("\t\tPT[main]: Success. Transcription G2P Statistics Written to HDD under album storage dir.")
+                print("\t\tPT[main]: Success. Transcription G2P Statistics Written to HDD under song storage dir.")
 
 
 if __name__ == '__main__':
@@ -368,6 +368,32 @@ if __name__ == '__main__':
     # Load required target_artists.json into memory:
     print("PT[Init]: Loading artist file into memory (approx. 154 MB) please be patient...")
     target_artists = load_web_scraper_target_urls(target_artists_loc=target_artists_loc)
+    # Just do this once:
+    update_metadata = True
+    if update_metadata:
+        print("PT[Init-OneTime]: Performing One-Time update of artist metadata with 'transcribed' flag.")
+        ''' Add a boolean 'transcribed' flag to every song '''
+        for aid, artist_info in target_artists.items():
+            for alid, album_info in artist_info['albums'].items():
+                if album_info['songs'] is None:
+                    print("PT[Init-OneTime]: Alert! Artist AID %d (%s), ALID %d (%s) has no recorded songs!"
+                          % (int(aid), artist_info['name'], int(alid), album_info['name']))
+                else:
+                    try:
+                        for sid, song_info in album_info['songs'].items():
+                            if 'transcribed' not in song_info:
+                                target_artists[aid]['albums'][alid]['songs'][sid]['transcribed'] = False
+                    except AttributeError as err:
+                        print("AttributeError while attempting to access album's songs. Error occurred with artist "
+                              "AID %d (%s), ALID %d (%s), which has ['songs'] of length: %d"
+                              % (int(aid), artist_info['name'], int(alid), album_info['name'], 0))
+                        print(str(err))
+                        exit(-1)
+        ''' Update the representation on the hard drive '''
+        with open(target_artists_loc, 'w') as fp:
+            json.dump(fp, target_artists, indent=4, cls=EnumEncoder)
+        exit(0)
+    # TODO: Write modifications to JSON file.
     print("PT[Init]: Metadata loaded into memory. Proceeding to text pre-processing via tokenization.")
     # Note: If the download_new_corpus flag is set; script will execute nltk download manager then terminate.
     main(download_new_corpus=False, storage_dir=global_storage_dir)
