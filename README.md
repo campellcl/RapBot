@@ -29,6 +29,8 @@ Data obtained from:
 * Choosing a Language for Grapheme to Phoneme Transcription
     * The Advanced Research Projects Agency Alphabet [(ARPABET)](https://en.wikipedia.org/wiki/Arpabet)
     * The International Phonetic Alphabet [(IPA)](https://en.wikipedia.org/wiki/International_Phonetic_Alphabet)
+* Comparing and Contrasting Automatically Generated Transcriptions
+    * A patent on [measuring phonetic similarity](http://www.freepatentsonline.com/7010487.html)
 
 ## Handling Slang
 * General Idea: Create a dictionary of failed transcriptions sorted by occurrence.
