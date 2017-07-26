@@ -524,9 +524,9 @@ def web_scrape_albums(artist_info):
 def remove_artist_from_metadata(artists, aid):
     """
     remove_artist_from_metadata: Removes the artist with the specified AID from memory and updates key indices.
-    :param artists:
-    :param aid:
-    :return:
+    :param artists: A dictionary of artists read from 'scraper_metadata.json'.
+    :param aid: The unique identifier of the artist to be removed.
+    :return updated_artists: The original artists dictionary with the specified AID removed, with the AID's re-assigned.
     """
     updated_artists = OrderedDict()
     index = 0
@@ -545,6 +545,26 @@ def remove_artist_from_metadata(artists, aid):
     return updated_artists
 
 
+def remove_album_from_metadata(albums, alid):
+    """
+    remove_album_from_metadata: Removes the album with the specified ALID from memory and updates key indices of the
+        dictionary: artist['albums'].
+    :param albums: A dictionary of artists read from 'album_metadata.json'.
+    :param alid: The unique identifier of the album to be removed.
+    :return updated_albums: The original albums dictionary with the specified ALID removed, with the ALID's re-assigned.
+    """
+    updated_albums = OrderedDict()
+    index = 0
+    for ALID, album_info in albums.items():
+        if ALID != alid:
+            updated_albums[index] = album_info
+            index += 1
+    # Update the ALID fields in album_info
+    for ALID, album_info in updated_albums.items():
+        updated_albums[ALID]['ALID'] = ALID
+    return updated_albums
+
+
 def update_artist_metadata_on_hdd(artists):
     """
     update_artist_metadata_on_hdd: Updates the artist's metadata ('scraper_metadata.json') on the local machine.
@@ -553,6 +573,16 @@ def update_artist_metadata_on_hdd(artists):
     """
     with open(scraper_metadata_json, 'w') as fp:
         json.dump(artists, fp, indent=4, cls=ScraperStatusEncoder)
+
+
+def update_album_metadata_on_hdd(artist_info, albums):
+    """
+    update_album_metadata_on_hdd: Updates the album's metadata ('album_metadata.json') on the local machine.
+    :param albums: An artist's dictionary of albums and their associated metadata.
+    :return None: Upon completion, the json file 'album_metadata.json' will be updated with the provided dict.
+    """
+    with open(artist_info['storage_dir'] + '\\album_metadata.json', 'w') as fp:
+        json.dump(albums, fp, indent=4, cls=ScraperStatusEncoder)
 
 
 def scrape_artists():
@@ -578,20 +608,20 @@ def scrape_artists():
         print("WS3[scrape_artists]: Artist metadata stored on the HDD, stage_zero of Artist IR Pipeline "
               "complete for all artists.")
         print("WS3[scrape_artists]: Initializing storage directories for all artists on the local machine:")
-        init_artists_storage_dirs(artists=artists, resume_aid=0)
+        init_artists_storage_dirs(artists=artists)
         print("WS3[scrape_artists]: Done; directories initialized for every possible artist on the local machine. "
               "Exiting with success!")
         exit(0)
 
 
-def init_artists_storage_dirs(artists, resume_aid):
+def init_artists_storage_dirs(artists):
     """
     init_artists_storage_dirs: Initializes storage directories on the local machine for all artists in the provided
         'artists' dictionary, beginning at the specified resume_aid.
     :param artists: The artist metadata contained in 'scraper_metadata.json' and loaded into memory by the
         helper function: 'get_scraper_metadata'.
-    :param resume_aid: The specified unique artist identifier to resume directory instantiation at.
-    :return:
+    :return None: Upon completion, all artist storage directories will be instantiated on the local machine. Artist's
+        whose names are not directory compatible are removed from the metadata.
     """
     finished = False
     control_interrupt = (False, None)
@@ -623,74 +653,142 @@ def init_artists_storage_dirs(artists, resume_aid):
             return
 
 
+def init_artists_album_storage_dirs(artist_info, albums):
+    """
+    init_album_storage_dirs: Initializes storage directories on the local machine for all albums in the provided
+        'albums' dictionary of a particular artist.
+    :param artist_info: The artist metadata contained in 'scraper_metadata.json' and loaded into memory by helper
+        function.
+    :param albums: The album metadata contained in 'album_metadata.json' and loaded into memory by helper function.
+    :return None: Upon completion, all artist storage directories will be instantiated on the local machine. Artist's
+        whose names are not directory compatible are removed from the metadata.
+    """
+    control_interrupt = (False, None)
+    while True:
+        for alid, album_info in albums.items():
+            # Ensure that the album storage directory does not already exist:
+            if not os.path.isdir(album_info['storage_dir']):
+                success = init_album_storage_dir(album_info)
+                if success:
+                    print("\tWS3[init_albums_storage_dirs]: Initialized local storage dir for ALID %d (%s)."
+                          % (alid, album_info['name']))
+                else:
+                    # Failure to initialize artist storage directory.
+                    print("\tWS3[init_albums_storage_dirs]: Failure to initialize local directory for ALID %d (%s). "
+                          "Requesting that this album be removed from AID %d's metadata..."
+                          % (alid, album_info['name'], album_info['assoc_aid']))
+                    control_interrupt = (True, alid)
+                    break
+        # Update the artist's status in the IR Pipeline <defer this to control loop>
+        # artists[albums[0]['assoc_aid']]['scrape_status'] = ScraperStatus.stage_three
+        if control_interrupt[0]:
+            # An album interrupted the IR pipeline with a failure to create a local storage directory.
+            albums = remove_album_from_metadata(albums=albums, alid=control_interrupt[1])
+            print("WS3[init_album_storage_dirs]: Control loop recognized request for deletion; album removed. "
+                  "Re-attempting to initialize storage directories without this album:")
+            control_interrupt = (False, None)
+        else:
+            update_album_metadata_on_hdd(artist_info, albums)
+            '''
+            print("\tWS3[init_albums_storage_dirs]: Completed! All album's now have local directories initialized. "
+                  "Updated album metadata on local machine.")
+            '''
+            return
+
+
+def init_album_storage_dir(album_info):
+    """
+    init_album_storage_dir: Initializes a storage directory on the local machine for the provided album if one does
+        not already exist. If the directory does exist, no changes are made.
+    :param album_info: All metadata on the album including:
+        * assoc_aid: The artist's unique identifier (int).
+        * alid: The album's unique identifier (int).
+        * name: The album's name (string).
+        * url: The album's url (string).
+        * storage_dir: The album's storage directory on the local machine (string).
+        * scraped: A boolean flag indicating whether or not the album has been scraped in its entirety.
+    :return boolean: True if the directory specified in album_info['storage_dir'] was created on the local
+        machine (or if it existed already). Otherwise False is returned.
+    """
+    # Check to see if the artist's storage directory exists
+    if os.path.isdir(album_info['storage_dir']):
+        '''
+        print("WS3[init_album_storage_dir]: Album %d (%s) storage dir already exists."
+              % (album_info['ALID'], album_info['name']))
+        '''
+        return True
+    else:
+        try:
+            os.makedirs(album_info['storage_dir'])
+        except OSError as err:
+            if type(err) is NotADirectoryError:
+                print("WS3[init_album_storage_dir]: NADE OSError encountered. Exception reads: %s.\nRequesting removal"
+                      " of ALID: %d (%s) from metadata." % (str(err), album_info['alid'], album_info['name']))
+                return False
+            else:
+                print("WS3[init_album_storage_dir]: OSError exception encountered. Exception reads: %s" % str(err))
+                return False
+        print("WS3[init_album_storage_dir]: Initialized storage dir for album %d (%s)"
+              % (album_info['alid'], album_info['name']))
+        return True
+
+
 def scrape_albums():
     """
     scrape_albums: Helper method for main, handles the scraping of album metadata and the creation of the appropriate
         album subdirectories.
-    :return None: Upon completion
+    :return None: TODO: Upon completion, etc...
     """
     ''' Proceed with album scraping IR Pipeline '''
-    print("WS3[main]: Program started with directive: SCRAPE_ALBUMS\nLoading WebScraper MetaData...")
+    print("WS3[scrape_albums]: Program started with directive: SCRAPE_ALBUMS\nLoading WebScraper MetaData...")
     # Load metadata:
     artists = get_scraper_metadata()
-    print("WS3[main]: Data loaded. Resuming album scraping IR pipeline. Initializing artists' local "
+    print("WS3[scrape_albums]: Data loaded. Resuming album scraping IR pipeline. Initializing artists' local "
           "storage directories.")
-    # Create local storage directories for artist and update scraper status
+    artist_removal_que = OrderedDict()
     for aid, artist_info in artists.items():
         if artist_info['scrape_status'] != ScraperStatus.stage_three:
-            # Attempt to create a new storage directory for the artist if it doesn't already exist:
-            was_successful = init_artist_storage_dir(artist_info)
-            if not was_successful:
-                # If the attempt to create the directory was unsuccessful (invalid dir name), then modify the dict:
-                control_interrupt = (True, aid)
-                break
+            albums = web_scrape_albums(artist_info)
+            # Check to see if the artist had any albums to retrieve:
+            if albums is not None:
+                print("WS3[scrape_albums]: Metadata scraped for AID %d (%s)'s albums:" % (aid, artist_info['name']))
+                for alid, album_info in albums.items():
+                    print("\tWS3[scrape_albums]: ALID: %d (%s)" % (alid, album_info['name']))
+                with open(artist_info['storage_dir'] + "\\album_metadata.json", 'w') as fp:
+                    json.dump(fp=fp, obj=albums, indent=4)
+                artists[aid]['scrape_status'] = ScraperStatus.stage_two
+                print("WS3[scrape_albums]: Album metadata written to hard drive. "
+                      "Queued Artist's IR pipeline status update to stage_two.")
+                init_artists_album_storage_dirs(artist_info, albums)
+                artists[aid]['scrape_status'] = ScraperStatus.stage_three
+                with open(scraper_metadata_json, 'w') as fp:
+                    json.dump(artists, fp, indent=4, cls=ScraperStatusEncoder)
+                print("WS3[scrape_albums]: Album directories initialized on local machine. Updated artist's "
+                      "IR pipeline status to stage_three.")
             else:
-                artists[aid]['scrape_status'] = ScraperStatus.stage_one
-                print("WS3[main]: Updated Artist AID: %d (%s) IR pipeline status to stage_one."
-                      % (artist_info['AID'], artist_info['name']))
-                albums = web_scrape_albums(artist_info)
-                # Check to see if the artist had any albums to retrieve:
-                if albums is not None:
-                    print("WS3[main]: Artist's metadata scraped for albums:")
-                    for alid, album_info in albums.items():
-                        print("\tWS3[main]: ALID: %d (%s)" % (alid, album_info['name']))
-                    with open(artist_info['storage_dir'] + "\\album_metadata.json", 'w') as fp:
-                        json.dump(fp=fp, obj=albums, indent=4)
-                    artists[aid]['scrape_status'] = ScraperStatus.stage_two
-                    print("WS3[main]: Artist metadata written to hard drive. "
-                          "Updated Artist's IR pipeline status to stage_two.")
-                    for alid, album_info in albums.items():
-                        if os.path.isdir(album_info['storage_dir']):
-                            artists[album_info['assoc_aid']]['scrape_status'] = ScraperStatus.stage_three
-                        else:
-                            try:
-                                os.makedirs(album_info['storage_dir'])
-                                artists[album_info['assoc_aid']]['scrape_status'] = ScraperStatus.stage_three
-                            except OSError as err:
-                                print("WS3[main]: Error attempting to initialize album storage directory on local machine. "
-                                      "Exception reads:\n\t%s" % str(err))
-                    print("WS3[main]: Album directories initialized on local machine. Updated artist's IR pipeline status"
-                          " to stage_three.")
-                    with open(scraper_metadata_json, 'w') as fp:
-                        json.dump(artists, fp, indent=4, cls=ScraperStatusEncoder)
-                    print("WS3[main]: Artist album metadata IR task completed successfully. Updated artist metadata on local "
-                          "machine.")
-                else:
-                    # The artist had no albums to scrape, remove them from the metadata.
-                    # TODO: Modify code so no dictionary removal is happening during iteration
-                    artists = remove_artist_from_metadata(artists, artist_info['AID'])
-                    print("WS3[main]: Control loop recognized the request for artist removal. Removed artist from memory.")
-                    # Update the representation on the hard drive:
-                    with open(scraper_metadata_json, 'w') as fp:
-                        json.dump(fp=fp, obj=artists, indent=4, cls=ScraperStatusEncoder)
-                    print("WS3[main]: Updated the artist metadata on the local machine")
+                # The artist had no albums to scrape, que the artist for removal from metadata.
+                artist_removal_que[aid] = artist_info
+                # artists = remove_artist_from_metadata(artists, artist_info['AID'])
+                print("WS3[scrape_albums]: Request for artist removal received. Queued artist for removal.")
         else:
-            print("WS3[main]: Artist %d (%s) already at stage three in the IR Pipeline. "
+            print("WS3[scrape_albums]: Artist %d (%s) already at stage three in the IR Pipeline. "
                   "Proceeding to next artist." % (artist_info['AID'], artist_info['name']))
-    # If the control loop was interrupted due to a requested modification to the artists's dictionary:
-    if control_interrupt[0]:
-        artists = remove_artist_from_metadata(artists=artists, aid=control_interrupt[1])
+    print("WS3[scrape_albums]: Reached stage three in the IR Pipeline for all artists. "
+          "Proceeding to AID removal via queue...")
+    for remove_aid, remove_info in artist_removal_que.items():
+        artists = remove_artist_from_metadata(artists, remove_aid)
+        print("\tWS3[scrape_albums]: Removed artist AID %d (%s) from metadata.")
+    print("WS3[scrape_albums]: Finished the removal of artists with no detected albums. "
+          "Program terminated successfully; now exiting.")
+    exit(0)
 
+
+def scrape_songs(artists, albums):
+    """
+    scrape_songs: Handles the scraping of song metadata and the creation of the appropriate song subdirectories.
+    :return None: TODO: Upon, completion.
+    """
+    pass
 
 def main(operation):
     if operation == ProgramOperation.scrape_artists:
@@ -699,7 +797,7 @@ def main(operation):
         scrape_albums()
     elif operation == ProgramOperation.scrape_songs:
         # Proceed with song scraping IR Pipeline.
-        pass
+        scrape_songs()
     else:
         print("WS3[main]: Program operation incorrectly specified or not yet implemented.")
 
@@ -713,4 +811,4 @@ if __name__ == '__main__':
     ''' Determine where to resume scraping '''
     # Determine if the metadata targeting file exists:
     scraper_metadata_json = storage_dir + "\\WebScraper\\MetaData\\scraper_metadata.json"
-    main(operation=ProgramOperation.scrape_artists)
+    main(operation=ProgramOperation.scrape_albums)
